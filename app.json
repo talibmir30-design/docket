@@ -22,6 +22,14 @@
         {
           "photosPermission": "Allow Docket to select screenshots."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
       ]
     ],
     "extra": {
