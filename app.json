@@ -7,8 +7,23 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "android": {
-      "package": "com.talibmir.docket"
+      "package": "com.talibmir.docket",
+      "newArchEnabled": false
     },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Docket to read screenshots."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Docket to select screenshots."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "b03d9c56-ce09-4166-a3e7-086d759d01ad"
