@@ -1,41 +1,228 @@
-{
-  "expo": {
-    "name": "Docket",
-    "slug": "docket",
-    "owner": "taliibbmeers-team",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "userInterfaceStyle": "dark",
-    "android": {
-      "package": "com.talibmir.docket",
-      "newArchEnabled": false
-    },
-    "plugins": [
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow Docket to read screenshots."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow Docket to select screenshots."
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "kotlinVersion": "1.9.25"
-          }
-        }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "b03d9c56-ce09-4166-a3e7-086d759d01ad"
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  Dimensions,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  Alert
+} from 'react-native';
+import * as MediaLibrary from 'expo-media-library';
+import * as ImagePicker from 'expo-image-picker';
+
+const { width } = Dimensions.get('window');
+const COLUMN_WIDTH = (width - 36) / 2;
+
+export default function App() {
+  const [screenshots, setScreenshots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [permissionGranted, setPermissionGranted] = useState(false);
+
+  useEffect(() => {
+    loadScreenshots();
+  }, []);
+
+  const loadScreenshots = async () => {
+    try {
+      setLoading(true);
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+
+      if (status !== 'granted') {
+        setPermissionGranted(false);
+        setLoading(false);
+        Alert.alert(
+          'Permission Required',
+          'Docket requires access to your photo library to display screenshots.'
+        );
+        return;
       }
+
+      setPermissionGranted(true);
+
+      // Search for the native Screenshots album across iOS & Android
+      const albums = await MediaLibrary.getAlbumsAsync();
+      const screenshotAlbum = albums.find(
+        (a) =>
+          a.title.toLowerCase() === 'screenshots' ||
+          a.title.toLowerCase() === 'screen shots'
+      );
+
+      let fetchedAssets = [];
+
+      if (screenshotAlbum) {
+        const { assets } = await MediaLibrary.getAssetsAsync({
+          album: screenshotAlbum,
+          mediaType: ['photo'],
+          first: 50,
+          sortBy: ['creationTime'],
+        });
+        fetchedAssets = assets;
+      } else {
+        // Fallback: pull the most recent photos from the device camera roll
+        const { assets } = await MediaLibrary.getAssetsAsync({
+          mediaType: ['photo'],
+          first: 50,
+          sortBy: ['creationTime'],
+        });
+        fetchedAssets = assets;
+      }
+
+      setScreenshots(fetchedAssets);
+    } catch (error) {
+      console.error('Error fetching screenshots:', error);
+      Alert.alert('Error', 'Unable to fetch images from your device gallery.');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
+
+  const pickSingleImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setScreenshots((prev) => [result.assets[0], ...prev]);
+      }
+    } catch (error) {
+      console.error('Error opening image picker:', error);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      <View style={styles.header}>
+        <Text style={styles.title}>Docket</Text>
+        <TouchableOpacity style={styles.addButton} onPress={pickSingleImage}>
+          <Text style={styles.addButtonText}>+ Add Photo</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#38bdf8" />
+          <Text style={styles.loadingText}>Loading screenshots from gallery...</Text>
+        </View>
+      ) : !permissionGranted ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>Photo permission was not granted.</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={loadScreenshots}>
+            <Text style={styles.actionButtonText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      ) : screenshots.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>No screenshots found on this device.</Text>
+          <TouchableOpacity style={styles.actionButton} onPress={loadScreenshots}>
+            <Text style={styles.actionButtonText}>Scan Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={screenshots}
+          keyExtractor={(item) => item.id || item.uri}
+          numColumns={2}
+          contentContainerStyle={styles.list}
+          refreshing={loading}
+          onRefresh={loadScreenshots}
+          renderItem={({ item }) => (
+            <View style={styles.imageCard}>
+              <Image
+                source={{ uri: item.uri }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            </View>
+          )}
+        />
+      )}
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#090d16',
+    paddingTop: Platform.OS === 'android' ? 30 : 0,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#f8fafc',
+  },
+  addButton: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  loadingText: {
+    color: '#94a3b8',
+    marginTop: 12,
+    fontSize: 14,
+  },
+  emptyText: {
+    color: '#94a3b8',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  actionButton: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  actionButtonText: {
+    color: '#38bdf8',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  list: {
+    padding: 12,
+  },
+  imageCard: {
+    margin: 6,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#1e293b',
+  },
+  image: {
+    width: COLUMN_WIDTH,
+    height: 220,
+  },
+});
